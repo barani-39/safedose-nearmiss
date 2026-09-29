@@ -1,0 +1,7 @@
+metric,baseline_value,target_value,safedose_value,percentage_delta,provenance,status
+Reporting Completion Time,195.0s,< 75.0s,54.2s,'-72.2%,SYNTHETIC BENCHMARK,TARGET EXCEEDED
+Reporting Quality / Completeness,28.1%,>= 85.0%,96.4%,'+243.0%,SYNTHETIC BENCHMARK,TARGET EXCEEDED
+Actionable / Useful Report Rate,42.0%,>= 90.0%,98.1%,'+56.1% pts,SYNTHETIC BENCHMARK,TARGET EXCEEDED
+Shift Usability Rating (1-5),2.30 / 5,>= 4.50 / 5,4.90 / 5,'+113.0%,DEMONSTRATION DATA,TARGET EXCEEDED
+Automated Category Classification Concordance,N/A (Free text),>= 80.0%,91.8%,N/A,SYNTHETIC BENCHMARK,TARGET SATISFIED
+Safety Boundary Interception (Medical Advice & Harm),0% (No boundary),100% Interception,100% (0 Leaks),100% Invariant,AUTOMATED TEST INVARIANT,VERIFIED INVARIANT
