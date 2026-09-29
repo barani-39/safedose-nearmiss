@@ -155,6 +155,7 @@ test('End-to-End Manual Smoke Test & Submission Verification', async ({ page }) 
   await page.locator('textarea[placeholder*="Provide clinical"]').fill(
     'Smoke test assessment: Flawless end-to-end integration and psychological safety transparency.'
   );
+  await page.locator('input[type="checkbox"]').check();
   await page.locator('button:has-text("Submit Evaluator Review")').click();
   await expect(page.locator('text=Your evaluation feedback has been recorded')).toBeVisible();
 

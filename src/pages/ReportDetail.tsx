@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, FlaskConical, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, FlaskConical, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { NearMissReport, ReportStatus, OperationalPriority } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { LoadingSpinner, EmptyState, ErrorState } from '@/components/States';
 import { Alert } from '@/components/Alert';
 import { STATUSES, PRIORITIES, INCIDENT_TYPES } from '@/lib/constants';
+import { useAuth } from '@/contexts';
+import { recordAuditEvent } from '@/lib/audit';
 
 export function ReportDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { role, isReviewerOrAdmin, user } = useAuth();
 
   const [report, setReport] = useState<NearMissReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +82,20 @@ export function ReportDetail() {
       setSaving(false);
       return;
     }
+
+    recordAuditEvent({
+      action: 'REVIEW_NOTES_UPDATED',
+      resource_type: 'REPORT',
+      resource_id: report.id,
+      user_id: user?.id,
+      user_role: role,
+      details: {
+        new_status: status,
+        operational_priority: editedPriority,
+        verified_category: humanVerifiedCategory,
+        notes_length: reviewerNotes.trim().length,
+      },
+    });
 
     setSaving(false);
     setSavedAt(new Date().toLocaleTimeString('en-GB'));
@@ -315,11 +332,20 @@ export function ReportDetail() {
             </Alert>
           )}
 
+          {!isReviewerOrAdmin && (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>
+                You are currently in <strong>{role}</strong> mode. Saving clinical reviews requires Reviewer or Admin role.
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <button
               onClick={handleSaveReview}
-              disabled={saving}
-              className="inline-flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50"
+              disabled={saving || !isReviewerOrAdmin}
+              className="inline-flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Review'}

@@ -40,9 +40,12 @@ import type {
   ReportInsert,
 } from '@/types';
 import { Alert, DisclaimerBar } from '@/components/Alert';
+import { useAuth } from '@/contexts';
+import { recordAuditEvent } from '@/lib/audit';
 
 export function ReportForm() {
   const navigate = useNavigate();
+  const { role, user } = useAuth();
   const startTimeRef = useRef<number>(Date.now());
 
   const [ward, setWard] = useState('');
@@ -182,6 +185,22 @@ export function ReportForm() {
     } catch (evalErr) {
       console.warn('Evaluation session recording warning (non-fatal):', evalErr);
     }
+
+    // Record audit event
+    recordAuditEvent({
+      action: 'REPORT_SUBMITTED',
+      resource_type: 'REPORT',
+      resource_id: data.id,
+      user_id: user?.id,
+      user_role: role,
+      details: {
+        ward: payload.ward,
+        medicine_category: payload.medicine_category,
+        incident_type: payload.incident_type,
+        operational_priority: payload.operational_priority,
+        anonymous: payload.anonymous,
+      },
+    });
 
     setSubmitting(false);
     navigate(`/report/confirmation/${data.id}`);

@@ -16,36 +16,9 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const exportDir = path.join(rootDir, 'data', 'evaluation', 'exports');
 
-/**
- * Sanitizes input to prevent CSV Formula Injection (CWE-1236).
- * Any value beginning with =, +, -, @, tab, or carriage return is prefixed with a single quote.
- */
-export function sanitizeCSVValue(val: unknown): string {
-  if (val === null || val === undefined) return '';
-  const str = String(val);
+import { sanitizeCSVValue, buildCSV } from '../src/lib/exportUtils.js';
 
-  // Check dangerous leading characters
-  const dangerousPrefixes = ['=', '+', '-', '@', '\t', '\r'];
-  let safeStr = str;
-  if (dangerousPrefixes.some((p) => safeStr.startsWith(p))) {
-    safeStr = `'` + safeStr;
-  }
-
-  // Quote if contains commas, double quotes, or newlines
-  if (safeStr.includes(',') || safeStr.includes('"') || safeStr.includes('\n') || safeStr.includes('\r')) {
-    safeStr = `"${safeStr.replace(/"/g, '""')}"`;
-  }
-
-  return safeStr;
-}
-
-export function buildCSV(headers: string[], rows: Record<string, unknown>[]): string {
-  const headerLine = headers.map(sanitizeCSVValue).join(',');
-  const rowLines = rows.map((row) =>
-    headers.map((h) => sanitizeCSVValue(row[h])).join(',')
-  );
-  return [headerLine, ...rowLines].join('\n');
-}
+export { sanitizeCSVValue, buildCSV };
 
 function calculateSHA256(filePath: string): string {
   const buffer = fs.readFileSync(filePath);

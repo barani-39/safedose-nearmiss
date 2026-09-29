@@ -15,6 +15,7 @@ import {
   SYNTHETIC_STAKEHOLDER_FEEDBACK,
   type StakeholderFeedback,
 } from '@/lib/stakeholderFeedback';
+import { recordAuditEvent } from '@/lib/audit';
 
 export function StakeholderValidation() {
   const [feedbackList, setFeedbackList] = useState<StakeholderFeedback[]>(() => {
@@ -39,11 +40,12 @@ export function StakeholderValidation() {
   const [safetyScore, setSafetyScore] = useState<number>(5);
   const [quote, setQuote] = useState('');
   const [keyBenefit, setKeyBenefit] = useState('');
+  const [consentChecked, setConsentChecked] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState(false);
 
   function handleSubmitFeedback(e: React.FormEvent) {
     e.preventDefault();
-    if (!name || !role || !quote.trim()) return;
+    if (!name || !role || !quote.trim() || !consentChecked) return;
 
     const newEntry: StakeholderFeedback = {
       id: `live-fb-${Date.now()}`,
@@ -64,6 +66,9 @@ export function StakeholderValidation() {
       keyBenefit: keyBenefit.trim() || 'Rapid reporting & safety transparency',
       isSyntheticDemo: false, // Live User Feedback!
       dateSubmitted: new Date().toISOString().split('T')[0],
+      verificationStatus: 'Pending Verification',
+      consentGiven: true,
+      appVersion: 'v2.4-prototype',
     };
 
     const updated = [newEntry, ...feedbackList];
@@ -73,6 +78,20 @@ export function StakeholderValidation() {
     const userSubmissions = updated.filter((f) => !f.isSyntheticDemo);
     localStorage.setItem('safedose_live_feedback', JSON.stringify(userSubmissions));
 
+    recordAuditEvent({
+      action: 'STAKEHOLDER_FEEDBACK_SUBMITTED',
+      resource_type: 'REVIEW',
+      resource_id: newEntry.id,
+      user_role: 'REPORTER',
+      details: {
+        role: newEntry.role,
+        rating: newEntry.rating,
+        trust: newEntry.hospitalTrust,
+        consent_given: true,
+        status: 'Pending Verification',
+      },
+    });
+
     // Reset form
     setName('');
     setRole('');
@@ -80,6 +99,7 @@ export function StakeholderValidation() {
     setTrust('');
     setQuote('');
     setKeyBenefit('');
+    setConsentChecked(false);
     setSubmittedMessage(true);
     setTimeout(() => setSubmittedMessage(false), 5000);
   }
@@ -185,7 +205,8 @@ export function StakeholderValidation() {
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <BadgeCheck className="w-3 h-3 text-emerald-600" /> Live Evaluator
+                      <BadgeCheck className="w-3 h-3 text-emerald-600" />
+                      Live Evaluator ({fb.verificationStatus || 'Pending Review'})
                     </span>
                   )}
                 </div>
@@ -335,10 +356,26 @@ export function StakeholderValidation() {
             />
           </div>
 
+          <div className="pt-1">
+            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700 select-none">
+              <input
+                type="checkbox"
+                required
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span>
+                I consent to this feedback being recorded for academic research and prototype evaluation under SafeDose NearMiss version <strong>v2.4-prototype</strong>. All live submissions are marked with status <em>Pending Verification</em>.
+              </span>
+            </label>
+          </div>
+
           <div className="flex justify-end">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition shadow-sm"
+              disabled={!consentChecked}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-3.5 h-3.5" />
               Submit Evaluator Review

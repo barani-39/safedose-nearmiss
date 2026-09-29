@@ -1,6 +1,8 @@
 import { NavLink, Link } from 'react-router-dom';
 import { ShieldPlus, Menu, X, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '@/contexts';
+import type { UserRole } from '@/types';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -15,6 +17,7 @@ const NAV_ITEMS = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { role, setRole } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50/70 flex flex-col font-sans text-slate-900 antialiased selection:bg-teal-100 selection:text-teal-900">
@@ -69,8 +72,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
               ))}
             </nav>
 
-            {/* Quick Action Button & Mobile Toggle */}
+            {/* Quick Action Button & Role Switcher & Mobile Toggle */}
             <div className="flex items-center gap-2">
+              {/* Role Switcher */}
+              <div className="flex items-center gap-1 bg-slate-100/80 rounded-lg p-1 border border-slate-200/80">
+                <span className="text-[10px] uppercase font-bold text-slate-500 pl-1 hidden xl:inline">Role:</span>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="text-xs font-semibold bg-white border border-slate-200 rounded px-2 py-1 text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer shadow-2xs"
+                  aria-label="Active user role"
+                  title="Switch role perspective for demo and evaluation"
+                >
+                  <option value="REVIEWER">Reviewer</option>
+                  <option value="REPORTER">Reporter</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="ANONYMOUS">Anonymous</option>
+                </select>
+              </div>
+
               <Link
                 to="/report"
                 className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition shadow-xs"

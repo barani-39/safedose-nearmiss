@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,7 +15,7 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { FileText, Calendar, AlertOctagon, Clock, CheckCircle, Lightbulb } from 'lucide-react';
+import { FileText, Calendar, AlertOctagon, Clock, CheckCircle, Lightbulb, Printer, TrendingUp } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { NearMissReport } from '@/types';
 import { LoadingSpinner, EmptyState, ErrorState } from '@/components/States';
@@ -102,6 +104,32 @@ export function Dashboard() {
       .sort((a, b) => b.count - a.count);
   }, [reports]);
 
+  const weeklyTrendData = useMemo(() => {
+    if (reports.length === 0) return [];
+    const sorted = [...reports].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const buckets: Record<string, { week: string; count: number; highPriority: number; resolved: number }> = {};
+    for (const r of sorted) {
+      const d = new Date(r.created_at);
+      const startOfWeek = new Date(d);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      const key = `${startOfWeek.getDate()} ${startOfWeek.toLocaleString('default', { month: 'short' })}`;
+
+      if (!buckets[key]) {
+        buckets[key] = { week: key, count: 0, highPriority: 0, resolved: 0 };
+      }
+      buckets[key].count += 1;
+      if (r.operational_priority === 'HIGH') buckets[key].highPriority += 1;
+      if (r.status === 'Closed') buckets[key].resolved += 1;
+    }
+
+    return Object.values(buckets);
+  }, [reports]);
+
   const insights = useMemo(() => {
     const result: string[] = [];
 
@@ -180,11 +208,20 @@ export function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Safety Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          All metrics are calculated from stored near-miss reports. No data is hard-coded.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Safety Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            All metrics are calculated from stored near-miss reports. No data is hard-coded.
+          </p>
+        </div>
+        <Link
+          to="/audit-report"
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-lg bg-slate-800 text-white hover:bg-slate-900 transition shadow-2xs self-start sm:self-auto"
+        >
+          <Printer className="w-4 h-4 text-slate-300" />
+          Printable Clinical Audit Report
+        </Link>
       </div>
 
       {/* Summary Cards */}
@@ -202,6 +239,44 @@ export function Dashboard() {
           );
         })}
       </div>
+
+      {/* Weekly Incident Velocity Trends */}
+      {weeklyTrendData.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700">Near-Miss Reporting Volume Over Time</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Chronological incident frequency and triage resolution</p>
+            </div>
+            <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={weeklyTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0d9488" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorHigh" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ea580c" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#ea580c" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+                <Area type="monotone" dataKey="count" name="Total Reports" stroke="#0d9488" fillOpacity={1} fill="url(#colorCount)" />
+                <Area type="monotone" dataKey="highPriority" name="High Priority" stroke="#ea580c" fillOpacity={1} fill="url(#colorHigh)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Insights */}
       {insights.length > 0 && (

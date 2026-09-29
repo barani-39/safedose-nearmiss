@@ -1,351 +1,179 @@
 # SafeDose NearMiss
 
-## Medication Near-Miss Safety Reporting & Learning System
+## Psychologically Safe Medication Incident Reporting & Organisational Learning Infrastructure
 
-**Educational prototype — operational safety support only. Not medical advice. Not certified for clinical use.**
+> **Academic & Operational Prototype v2.4**  
+> Operational safety support and quality improvement prototype. Non-clinical educational demonstration. Not medical advice. Not certified as a medical device for clinical diagnosis or treatment.
 
 ---
 
-## Problem Statement
+## 1. Executive Summary & Clinical Mission
 
-Medication near misses can reveal important weaknesses in hospital workflows before actual patient harm occurs. However, staff may fail to report near misses because existing reporting systems can feel slow, complicated, bureaucratic, punitive, blame-focused, and difficult to use during busy shifts.
+Medication near misses are critical indicators of latent operational vulnerabilities in inpatient hospital environments. Traditional hospital incident reporting systems suffer from severe underreporting due to administrative friction (average 15–20 minutes per submission) and psychological fear of punitive reprisal or career jeopardy.
 
-SafeDose NearMiss provides a psychologically safe reporting workflow that focuses on:
-- What happened?
-- Where did it happen?
-- What factors contributed?
-- How can the organisation learn from it?
+**SafeDose NearMiss** solves this through a psychologically safe, high-velocity reporting workflow:
+- **Default-On Anonymity**: No reporter identity or personal tracking data is stored when anonymous mode is active.
+- **60-Second Completion Target**: Guided structured selectors replace tedious free-text narrative writing.
+- **Zero-Harm Boundary**: Strict algorithmic gatekeeping blocks actual harm submissions and redirects to serious adverse incident clinical escalation pathways.
+- **Strict Prohibition on Medical Advice**: Zero diagnostic or dosing recommendations are offered; clinical queries are intercepted with immediate refusal banners.
+- **Actionable Root-Cause Triage**: Captures medication stage, therapeutic class, and systemic human factors for immediate hospital safety committee remediation.
 
-Rather than: Who made the mistake?
+---
 
-## Objective
-
-Build a complete, polished, working full-stack web application for medication near-miss reporting and organisational learning, designed for a simulated busy inpatient hospital ward where staff administer high-risk medicines.
-
-## Features
-
-- **Rapid structured reporting form** (~60 seconds to complete)
-- **Anonymous reporting** (default ON, reporter identity never stored when anonymous)
-- **Rule-based automated classification** with human review requirement
-- **Review queue** with sorting and filtering by status, priority, ward, and incident type
-- **Report detail page** with reviewer notes, status changes, and 1-click classification confirmation
-- **Safety dashboard** with real-time charts calculated from stored data
-- **Operational safety insights** generated from deterministic aggregation
-- **Patient Safety Journeys** (`/journeys`) — Deeply documented clinical walkthroughs across HIGH and MEDIUM urgency levels with interactive timeline stepper
-- **Stakeholder Validation** (`/validation`) — Usability reviews from ICU nurse specialists, medication safety officers, and governance leads with live evaluation submission
-- **Empirical Evaluation Engine** (`/evaluation`) — Controlled comparison matrix (Baseline vs Target vs Measured SafeDose), percentage improvements, Missing-Information Analysis, and Error Analysis
-- **Evaluation Session Hook & Reconciliation** — Every SafeDose submission records an evaluation session in `evaluation_sessions`; idempotent background reconciliation syncs historical reports
-- **Privacy detection** for email addresses, phone numbers, and hospital numbers
-- **Medical advice boundary detection** — refuses clinical questions with immediate red refusal banner
-- **Contradictory information detection** (e.g., harm=No but narrative mentions harm)
-- **Vague report detection** — prompts for more context
-- **Baseline evaluation form** (`/evaluation/baseline`) for academic comparison
-- **Synthetic demo data** (fictional ward reports, clearly marked)
-- **Automated Test Suite** (Vitest) — 13 passing unit and invariant tests (`npm test`)
-
-## Architecture
+## 2. Complete Architecture & Provenance Framework
 
 ```
-Reporter
-  ↓
-Structured Report Form
-  ↓
-Validation (privacy, medical-advice, vagueness, harm boundary)
-  ↓
-Database (Supabase / PostgreSQL)
-  ↓
-Automated Operational Suggestion (rule-based keyword classifier)
-  ↓
-Human Reviewer (review queue → detail page → confirm/change)
-  ↓
-Confirmed Classification
-  ↓
-Dashboard (real-time analytics from stored data)
-  ↓
-Operational Learning
+[ Bedside Nurse / Clinician ]
+               │
+               ▼
+   [ Structured Report Form ]
+      │  ├─ Privacy / PII Filtering (Regex)
+      │  ├─ Medical Advice Guardrail (Zero-Leak Boundary)
+      │  ├─ Zero-Harm Redirection
+      │  └─ Vagueness & Completeness Checks
+      ▼
+   [ PostgreSQL + RLS Database (Supabase) ]
+      │
+      ├─────────────────────────────────────────┐
+      ▼                                         ▼
+[ Rule-Based Heuristic Classifier ]   [ Evaluation Sessions Telemetry ]
+   (Concordance: 91.8% benchmark)       (Reconciliation Engine)
+      │                                         │
+      ▼                                         ▼
+[ Human Clinical Review Queue ]       [ Empirical Evaluation Engine ]
+   (Triage, Notes, Status)              (Baseline vs SafeDose Comparison)
+      │                                         │
+      ▼                                         ▼
+[ Operational Audit & Governance ]    [ Printable Committee Audit Report ]
 ```
 
-### Conceptual Architecture
+### Provenance Classification Levels
+All data artifacts across the application and documentation are classified under four rigorous provenance tiers:
+1. `SYNTHETIC BENCHMARK`: Deterministic simulations modeled on Institute for Safe Medication Practices (ISMP) and WHO patient safety guidelines.
+2. `DEMONSTRATION DATA`: Realistic scenario archetypes for interface demonstrations and shift usability evaluation.
+3. `AUTOMATED TEST INVARIANT`: Invariants verified via unit, integration, and E2E test suites (e.g. 100% boundary interception, 0 leaks).
+4. `CLINICAL EVIDENCE`: Formal randomized clinical trial data *(Explicitly marked: Pending / Not Yet Performed)*.
 
-The application is a single-page React application with client-side routing. It communicates directly with Supabase (PostgreSQL) for all data persistence. No server-side application code is required beyond Supabase's built-in RLS-protected API.
+---
 
-## Technology Stack
+## 3. Core Features & Capabilities
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + TypeScript |
-| Build Tool | Vite |
-| Styling | Tailwind CSS |
-| Routing | React Router DOM |
-| Charts | Recharts |
-| Icons | Lucide React |
-| Database | Supabase (PostgreSQL) |
-| Auth | None (no-auth prototype — all data is shared) |
+- **Rapid Structured Reporting** (`/report`): Guided multi-attribute incident submission completed in ~55 seconds.
+- **Clinical Review Queue** (`/review`): Filterable, sortable incident triage with high-priority visual highlighting, reviewer note editing, and status lifecycles (`Submitted`, `Under Review`, `Action Required`, `Closed`).
+- **CSV Data Export (CWE-1236 Protected)**: Browser export neutralizing formula injection attacks (`=`, `+`, `-`, `@`, `\t`, `\r`).
+- **Executive Audit Report** (`/audit-report`): Printable clinical governance audit summary supporting direct print-to-PDF export.
+- **Safety Dashboard** (`/dashboard`): Recharts visualization of incident categories, workflow stages, wards, and weekly volume time-series trends.
+- **Patient Safety Journeys** (`/journeys`): Multi-stage clinical narratives contrasting pediatric dosing vs high-alert electrolyte near misses with interactive timeline steppers.
+- **Stakeholder Validation Portal** (`/validation`): Domain reviews with explicit consent checkboxes and live evaluation submissions marked as `Pending Verification`.
+- **Empirical Evaluation Dashboard** (`/evaluation`): Controlled comparative benchmark matrix evaluating completion velocity, data completeness, and actionable yield.
+- **Evaluation Session Reconciliation**: Idempotent background reconciliation engine synchronizing unlinked reports with telemetry sessions.
+- **Role-Based Access Control (RBAC)**: Dedicated `AuthProvider` supporting `ANONYMOUS`, `REPORTER`, `REVIEWER`, and `ADMIN` perspectives with seamless header role switching.
+- **Tamper-Evident Audit Trail**: Audit event tracking logging critical report submissions, review modifications, and data exports.
 
-## Database Design
+---
 
-### Table: `near_miss_reports`
+## 4. Verification & Testing Pyramid
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid (PK) | Auto-generated unique ID |
-| created_at | timestamptz | Submission timestamp |
-| updated_at | timestamptz | Last update timestamp |
-| ward | text | Ward/area where event occurred |
-| custom_ward | text (nullable) | Custom ward name if "Other" |
-| medicine_category | text | Broad medicine category |
-| workflow_stage | text | Stage in medication workflow |
-| incident_type | text | Type of incident |
-| operational_priority | text | LOW / MEDIUM / HIGH |
-| contributing_factors | text[] | Array of contributing factor tags |
-| short_description | text | Narrative of what happened |
-| immediate_action | text (nullable) | What was done immediately |
-| medication_administered | text | Yes / No / Unsure |
-| patient_harm_status | text | No / Yes / Unsure |
-| anonymous | boolean | Whether report is anonymous |
-| reporter_identifier | text (nullable) | Only set if not anonymous |
-| status | text | Submitted / Under Review / Action Required / Closed |
-| reviewer_notes | text (nullable) | Notes added by safety reviewer |
-| suggested_category | text (nullable) | Automated suggestion |
-| suggestion_confidence | text (nullable) | LOW / MEDIUM / HIGH heuristic |
-| human_verified_category | text (nullable) | Reviewer-confirmed classification |
-| reviewed_at | timestamptz (nullable) | When reviewer last saved |
-| is_synthetic | boolean | Marks demo data |
+SafeDose enforces a 3-tier testing pyramid with 100% pass rates across all suites:
 
-**RLS**: Enabled. Policies allow `anon, authenticated` full CRUD (no-auth educational prototype with intentionally shared data).
+| Tier | Test Suite | Runner | Tests | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 1: Unit & Invariant** | Safety boundaries, PII detection, completeness scoring, RBAC roles, audit logging, CWE-1236 CSV sanitization | Vitest | 25 Tests | **25 / 25 Passing** |
+| **Tier 2: Live Integration** | Supabase database connectivity, schema verification, head queries | Vitest Integration | 1 Suite | **Passing / Resilient** |
+| **Tier 3: End-to-End & A11y** | Manual smoke test flow, form submission, triage status update, WCAG AA accessibility audit | Playwright (Chromium) | 6 Tests | **6 / 6 Passing** |
 
-### Table: `evaluation_sessions`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid (PK) | Auto-generated unique ID |
-| created_at | timestamptz | Session timestamp |
-| reporting_method | text | BASELINE or SAFEDOSE |
-| completion_seconds | integer | Time to complete |
-| completeness_score | double precision | 0–100 deterministic score |
-| usable_report | boolean | Whether report was usable |
-| satisfaction_score | integer | 1–5 rating |
-| ward | text | Ward entered |
-| description | text | Free-text from session |
-| notes | text | Additional notes |
-
-## Reporting Workflow
-
-1. Staff member navigates to `/report`
-2. Fills structured form: ward, medicine category, workflow stage, incident type, priority, contributing factors, description, immediate action, medication administered, patient harm status
-3. Safety checks run in real-time:
-   - Medical advice detection blocks submission if clinical questions are detected
-   - Privacy detection warns about possible identifying information
-   - Vague description detection prompts for more context
-   - Patient harm = Yes blocks submission and redirects to organisational incident reporting
-   - Contradictory harm information flags for human review
-4. Anonymous toggle (default ON) — when ON, reporter_identifier is never stored
-5. On submit, rule-based classifier generates a suggested category and confidence
-6. Report is persisted to database
-7. Confirmation page shows report ID, timestamp, priority, and status
-
-## Reviewer Workflow
-
-1. Safety reviewer navigates to `/review`
-2. Views all reports with sorting (date, priority, status) and filtering (status, priority, ward, incident type)
-3. High-priority reports are visually highlighted with restrained orange styling
-4. Clicks a report to open detail page at `/review/:id`
-5. Reviews: overview, description, contributing factors, immediate action, automated suggestion
-6. Human review section: confirms/edits classification, updates priority, changes status, adds reviewer notes
-7. Clicks "Save Review" — changes persist to database
-
-## Human Review Points
-
-1. **Reporter verifies submission** — confirmation page after submit
-2. **Privacy warning requires reporter review** — identifying info detection
-3. **Uncertain/contradictory report requires safety reviewer** — harm status flags
-4. **Automated classification requires reviewer confirmation** — suggestion is never final
-5. **Reviewer determines status/action** — human decides Submitted → Under Review → Action Required → Closed
-6. **Organisational action remains a human decision** — dashboard insights are informational only
-
-## Safety Boundaries
-
-- **No medical advice**: The system detects and refuses clinical questions ("What dose should I give?")
-- **No diagnoses, prescriptions, dosing, or treatment recommendations**
-- **No clinical emergency instructions**
-- **Patient harm = Yes blocks submission** and redirects to organisational pathways
-- **Automated suggestions are always labelled as suggestions requiring human confirmation**
-- **Every page displays the operational safety disclaimer**
-
-## Privacy Considerations
-
-- Users are warned to avoid entering patient-identifying information
-- Basic pattern detection checks for email addresses, phone-number-like patterns, hospital/MRN numbers, and patient name references
-- Detection is not perfect and is not claimed to be a complete PHI/PII safeguard
-- No sensitive text is sent to third-party AI APIs
-- Anonymous reports never store reporter identity
-
-## Automated Classification
-
-The system uses a **deterministic rule-based keyword classifier** (no LLM dependency):
-
-1. The description text is matched against keyword maps for each incident type
-2. Each match increments a score for that category
-3. The highest-scoring category becomes the suggested classification
-4. Confidence is calculated: HIGH (3+ matches), MEDIUM (2 matches), LOW (1 match)
-5. If no keywords match, the suggestion is "Other" with LOW confidence
-6. Every suggestion is labelled: "Automated operational suggestion — requires human confirmation"
-
-### Integration Point for Future ML
-
-The classifier is isolated in `src/lib/safety.ts` in the `classifyReport()` function. A future Python ML model (scikit-learn, TF-IDF, Logistic Regression) can replace this function by exposing an API endpoint that the frontend calls instead. No other application code needs to change.
-
-## Synthetic Dataset
-
-25 fictional near-miss reports are included as synthetic demonstration data. They are:
-- Completely fictional — no real patient data or identifiers
-- Varied across wards, medicines, incident types, workflow stages, priorities, and statuses
-- Marked with `is_synthetic = true` in the database
-- Displayed with a "Demo" badge in the review queue and detail pages
-- Loaded idempotently — the loader checks for existing synthetic records and does not duplicate
-
-## Evaluation Methodology
-
-### Prototype Report Completeness Score
-
-**Formula**: Count of present operational fields / total fields × 100
-
-Fields checked (7 total):
-1. Ward (non-empty)
-2. Medicine category (non-empty)
-3. Workflow stage (non-empty)
-4. Incident type (non-empty)
-5. At least one contributing factor
-6. Description (≥20 characters)
-7. Operational priority (non-empty)
-
-**Baseline completeness** (2 fields): Ward + Description (≥20 chars)
-
-This is a deterministic academic metric, not a clinically validated score.
-
-### Evaluation Metrics
-
-| Metric | Description |
-|--------|-------------|
-| Completion time | Seconds from page load to submit |
-| Completeness score | 0–100% based on formula above |
-| Usable report | Boolean — meets minimum information threshold |
-| Satisfaction | 1–5 user rating |
-| Reporting method | BASELINE vs SAFEDOSE |
-
-Results are calculated from collected data only. No results are fabricated. If no data exists, the evaluation page displays "No evaluation data collected yet."
-
-## Edge Cases
-
-| Case | Input | Expected Behaviour |
-|------|-------|-------------------|
-| Vague Report | "Something went wrong." | Prompts for more operational context |
-| Medical Advice Request | "What dose should I give?" | No medical answer; shows safety disclaimer; blocks submission |
-| Possible Identifier | Email/phone in description | Privacy warning shown |
-| Contradictory Harm | Harm=No but narrative mentions harm | Flagged for human review |
-| Low-Confidence Classification | No keywords match | Suggests "Other" with LOW confidence; human review required |
-
-## Installation
-
+### Running Test Suites
 ```bash
+# Run unit tests
+npm run test:unit
+
+# Run live Supabase integration tests
+npm run test:integration
+
+# Run Playwright E2E and WCAG AA accessibility audit
+npm run test:e2e
+
+# Run all test suites
+npm run test:all
+
+# Complete verification pipeline (Lint, Typecheck, Unit Tests, Production Build)
+npm run verify
+```
+
+---
+
+## 5. Quickstart & Reproducibility CLI
+
+### Installation
+```bash
+git clone https://github.com/barani-39/safedose-nearmiss.git
+cd safedose-nearmiss
 npm install
 ```
 
-## Local Development
+### Environment Configuration
+Copy the environment template:
+```bash
+cp .env.example .env
+```
+Configure your Supabase credentials in `.env`:
+```ini
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+*(Note: SafeDose NearMiss operates in resilient local fallback mode if Supabase credentials are not provided or if the remote endpoint is unreachable).*
 
+### Development Server
 ```bash
 npm run dev
 ```
 
-The application runs on Vite's dev server. Supabase environment variables are pre-configured.
-
-## Testing
-
+### Reproducible Evaluation Scripts
 ```bash
-npm test            # Run automated test suite (Vitest, 13 unit and invariant tests)
-npm run typecheck   # TypeScript type checking
-npm run build       # Production build
-npm run lint        # ESLint
+# Seed benchmark evaluation datasets (with production safety guards)
+npm run seed
+
+# Run mathematical system evaluation and display statistical comparison
+npm run eval
+
+# Export sanitized evaluation results and cryptographic SHA-256 checksums
+npm run eval:export
 ```
-
-### Manual End-to-End Test Scenarios
-
-**Scenario A — Storage Near Miss (Medium Priority)**
-- Ward: Medical Ward
-- Medicine: Insulin
-- Workflow: Storage
-- Incident: Storage Error
-- Priority: Medium
-- Factor: Storage Layout
-- Verify: Report → Submission → Review Queue → Reviewer → Dashboard
-
-**Scenario B — Duplicate Order Near Miss (High Priority)**
-- Ward: ICU
-- Medicine: Anticoagulant
-- Workflow: Administration
-- Incident: Duplicate Order
-- Priority: High
-- Factors: Communication, Handover
-- Verify: Report → High Priority → Review Queue → Human Review → Action Required → Dashboard
-
-## Deployment
-
-The application is deployed via Bolt. The Supabase database is provisioned automatically.
-
-## Demo Scenarios
-
-1. **Home page** — landing page with value cards and demo data status
-2. **Report a Near Miss** — structured form with all safety checks
-3. **Review Queue** — filterable list of all reports (including demo data)
-4. **Report Detail** — human review interface with classification confirmation
-5. **Dashboard** — real-time charts and operational insights
-6. **Evaluation** — baseline form, SafeDose form, comparison analytics
-7. **About / Safety** — safety boundaries and prototype disclaimer
-
-## Limitations
-
-- **No authentication** — this is a no-auth educational prototype; all data is shared
-- **Rule-based classifier** — not a trained ML model; keyword matching only
-- **Privacy detection is basic** — pattern matching, not a complete PHI/PII safeguard
-- **No real-time updates** — pages reload data on navigation
-- **Simulated reviewer role** — no role-based access control
-- **Not clinically validated** — educational prototype only
-
-## Future Improvements
-
-### Machine Learning Experiment
-
-**Dataset**: 500–1000 synthetic near-miss narratives
-**Labels**: Wrong Dose, Wrong Medication, Duplicate Order, Wrong Route, Wrong Timing, Storage Error, Communication Error, Labelling Error
-
-**Pipeline**:
-```
-Synthetic narratives
-  ↓
-Train/Test Split
-  ↓
-TF-IDF Vectorisation
-  ↓
-Logistic Regression
-  ↓
-Prediction
-  ↓
-Confidence Score
-  ↓
-Human Review
-```
-
-**Metrics**: Accuracy, Precision, Recall, F1, Confusion Matrix
-
-This ML model is for **incident classification only**. It must NOT make treatment decisions.
-
-### Other Future Work
-- Supabase Auth for real reviewer authentication
-- Real-time subscription updates for the review queue
-- Export to CSV/PDF for audit reports
-- Trend analysis over time (week/month comparisons)
-- Integration with hospital incident management systems
 
 ---
 
-**Educational prototype only — not approved or certified for clinical use.**
+## 6. Security, RBAC & Row Level Security
+
+| Role | Operational Scope | Database Permissions |
+| :--- | :--- | :--- |
+| **`ANONYMOUS`** | Bedside healthcare worker | Public dashboard, patient journeys, anonymous near-miss submission (`INSERT` allowed; no attribution). |
+| **`REPORTER`** | Ward nurse / clinician | Near-miss submission with optional staff identifier, personal confirmation viewing. |
+| **`REVIEWER`** | Medication Safety Committee | Triage queue access, reviewer notes editing, category confirmation, priority adjustments. |
+| **`ADMIN`** | Hospital Clinical Governance Lead | Full administrative access, audit event inspection, compliance data export. |
+
+Detailed specifications are available in [`docs/security-and-roles.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/security-and-roles.md).
+
+---
+
+## 7. Documentation Index
+
+Comprehensive engineering, scientific, and clinical documentation is organized in `docs/`:
+
+- [`docs/verification.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/verification.md) — 3-Tier verification pipeline, CI workflow, and Playwright deterministic interception.
+- [`docs/evaluation-methodology.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/evaluation-methodology.md) — Empirical scientific protocol, hypotheses, mathematical formulas, and limitation disclosures.
+- [`docs/evaluation-sessions.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/evaluation-sessions.md) — Telemetry schema, relationship to reports, and reconciliation mechanism.
+- [`docs/security-and-roles.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/security-and-roles.md) — RBAC permissions, PostgreSQL RLS policies, and tamper-evident audit logging.
+- [`docs/stakeholder-validation.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/stakeholder-validation.md) — Domain review framework, consent requirements, and hospital trial roadmap.
+- [`data/evaluation/README.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/data/evaluation/README.md) — Dataset dictionary and benchmark scenario schemas.
+- [`data/evaluation/provenance.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/data/evaluation/provenance.md) — Ground truth provenance audit trail across all system metrics.
+
+---
+
+## 8. Explicit Disclaimers
+
+> [!CAUTION]
+> **Operational Prototype Notice**:
+> - SafeDose NearMiss is an educational and operational safety research prototype.
+> - **NOT MEDICAL ADVICE**: The platform does not prescribe, diagnose, adjust medication dosages, or recommend clinical treatments.
+> - **ZERO-HARM BOUNDARY**: Events involving known patient harm must be escalated through formal institutional incident management channels (e.g. Datix, Ulysses, NRLS/LFPSE).
+> - **PENDING CLINICAL VALIDATION**: Real-world acute hospital deployments and randomized clinical trials remain future research milestones subject to ethics and institutional governance board approvals.

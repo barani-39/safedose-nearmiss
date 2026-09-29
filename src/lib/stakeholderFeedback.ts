@@ -12,6 +12,9 @@ export interface StakeholderFeedback {
   keyBenefit: string;
   isSyntheticDemo: boolean;
   dateSubmitted: string;
+  verificationStatus?: 'Verified' | 'Pending Verification';
+  consentGiven?: boolean;
+  appVersion?: string;
 }
 
 export const SYNTHETIC_STAKEHOLDER_FEEDBACK: StakeholderFeedback[] = [

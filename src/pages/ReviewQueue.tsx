@@ -1,11 +1,14 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Filter, ArrowUpDown, FlaskConical } from 'lucide-react';
+import { Filter, ArrowUpDown, FlaskConical, Download, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { NearMissReport } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { LoadingSpinner, EmptyState, ErrorState } from '@/components/States';
 import { STATUSES, PRIORITIES, WARDS, INCIDENT_TYPES } from '@/lib/constants';
+import { useAuth } from '@/contexts';
+import { buildCSV, downloadCSV } from '@/lib/exportUtils';
+import { recordAuditEvent } from '@/lib/audit';
 
 type SortField = 'created_at' | 'operational_priority' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -19,9 +22,11 @@ const STATUS_RANK: Record<string, number> = {
 };
 
 export function ReviewQueue() {
+  const { role, isReviewerOrAdmin, setRole, user } = useAuth();
   const [reports, setReports] = useState<NearMissReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
@@ -79,6 +84,53 @@ export function ReviewQueue() {
     }
   }
 
+  function handleExportCSV() {
+    setExporting(true);
+    try {
+      const headers = [
+        'id',
+        'created_at',
+        'ward',
+        'medicine_category',
+        'workflow_stage',
+        'incident_type',
+        'operational_priority',
+        'contributing_factors',
+        'short_description',
+        'immediate_action',
+        'medication_administered',
+        'patient_harm_status',
+        'anonymous',
+        'status',
+        'human_verified_category',
+        'is_synthetic',
+      ];
+
+      const rows = filtered.map((r) => ({
+        ...r,
+        contributing_factors: r.contributing_factors.join('; '),
+      }));
+
+      const csvContent = buildCSV(headers, rows);
+      downloadCSV(`safedose_near_miss_export_${new Date().toISOString().split('T')[0]}.csv`, csvContent);
+
+      recordAuditEvent({
+        action: 'REPORTS_EXPORTED_CSV',
+        resource_type: 'EXPORT',
+        user_id: user?.id,
+        user_role: role,
+        details: {
+          count: filtered.length,
+          has_filters: !!hasFilters,
+        },
+      });
+    } catch (err: unknown) {
+      console.error('Export error:', err);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (loading) return <LoadingSpinner label="Loading review queue..." />;
   if (error) return <ErrorState message={error} />;
 
@@ -86,12 +138,42 @@ export function ReviewQueue() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Review Queue</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Review submitted near-miss reports. Click any report to inspect details and add reviewer notes.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Review Queue</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Review submitted near-miss reports. Click any report to inspect details and add reviewer notes.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={filtered.length === 0 || exporting}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition shadow-2xs disabled:opacity-50"
+            title="Export sanitized CSV with formula injection protection"
+          >
+            <Download className="w-4 h-4 text-slate-500" />
+            {exporting ? 'Exporting...' : `Export CSV (${filtered.length})`}
+          </button>
+        </div>
       </div>
+
+      {!isReviewerOrAdmin && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <span>
+              You are viewing in <strong>{role}</strong> mode. Editing review notes and triage classifications requires Reviewer or Admin role.
+            </span>
+          </div>
+          <button
+            onClick={() => setRole('REVIEWER')}
+            className="text-xs font-bold text-amber-800 underline hover:text-amber-950"
+          >
+            Switch to Reviewer Mode
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">

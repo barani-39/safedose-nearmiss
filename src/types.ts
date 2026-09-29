@@ -84,3 +84,40 @@ export interface ClassificationSuggestion {
   confidence: 'LOW' | 'MEDIUM' | 'HIGH';
   matchedKeywords: string[];
 }
+
+export type UserRole = 'ANONYMOUS' | 'REPORTER' | 'REVIEWER' | 'ADMIN';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  role: UserRole;
+  display_name?: string;
+  department?: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  user_role: UserRole;
+  action: string;
+  resource_type: 'REPORT' | 'EVALUATION' | 'AUTH' | 'EXPORT' | 'REVIEW';
+  resource_id: string | null;
+  details: Record<string, unknown>;
+}
+
+export interface StakeholderReview {
+  id: string;
+  created_at: string;
+  name: string;
+  role: string;
+  organization: string;
+  department?: string;
+  feedback: string;
+  rating: number;
+  psychological_safety_rating: number;
+  consent_given: boolean;
+  app_version: string;
+  status: 'Pending' | 'Verified' | 'Archived';
+  is_synthetic: boolean;
+}
