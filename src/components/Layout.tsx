@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { ShieldPlus, Menu, X, HeartPulse, Users, BarChart3, ClipboardList, ListOrdered, Sparkles } from 'lucide-react';
+import { ShieldPlus, Menu, X, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 
 const NAV_ITEMS = [

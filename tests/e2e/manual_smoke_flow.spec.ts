@@ -1,10 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://vivdcdvblbfrowlbfwng.supabase.co';
-const SUPABASE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdmRjZHZibGJmcm93bGJmd25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NDkwNjQsImV4cCI6MjEwMzEyNTA2NH0.pBCaPVdb4V02_-AfU2uZQZdd26TaNGNcWl5D4FEQFwc';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { setupDeterministicSupabaseRoutes } from './fixtures/mockSupabase';
 
 test('End-to-End Manual Smoke Test & Submission Verification', async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -25,6 +20,8 @@ test('End-to-End Manual Smoke Test & Submission Verification', async ({ page }) 
       networkFailures.push(`[Network Error]: ${req.method()} ${req.url()} (${failure})`);
     }
   });
+
+  const dbState = await setupDeterministicSupabaseRoutes(page);
 
   // 1. Homepage loads correctly
   await page.goto('/');
@@ -79,31 +76,22 @@ test('End-to-End Manual Smoke Test & Submission Verification', async ({ page }) 
   await expect(page.locator('h1')).toContainText('Report Submitted');
 
   // 7. Confirm matching SAFEDOSE evaluation session is created for that report
-  // Verify in Supabase
-  const { data: dbReport, error: rErr } = await supabase
-    .from('near_miss_reports')
-    .select('*')
-    .eq('id', newReportId)
-    .single();
-
-  expect(rErr).toBeNull();
+  // Verify in intercepted database state
+  const dbReport = dbState.reports.find((r) => r.id === newReportId);
   expect(dbReport).toBeDefined();
-  expect(dbReport.ward).toBe('ICU');
-  expect(dbReport.anonymous).toBe(true);
-  expect(dbReport.reporter_identifier).toBeNull();
+  expect(dbReport?.ward).toBe('ICU');
+  expect(dbReport?.anonymous).toBe(true);
+  expect(dbReport?.reporter_identifier).toBeNull();
 
-  const { data: dbSessions, error: sErr } = await supabase
-    .from('evaluation_sessions')
-    .select('*')
-    .filter('notes', 'ilike', `%${newReportId}%`);
+  const dbSessions = dbState.evaluationSessions.filter(
+    (s) => s.notes && s.notes.includes(newReportId)
+  );
 
-  expect(sErr).toBeNull();
-  expect(dbSessions).toBeDefined();
-  expect(dbSessions!.length).toBe(1); // EXACTLY ONE session, zero duplicates!
-  expect(dbSessions![0].reporting_method).toBe('SAFEDOSE');
-  expect(dbSessions![0].completion_seconds).toBeGreaterThan(0);
-  expect(dbSessions![0].completeness_score).toBeGreaterThan(80);
-  expect(dbSessions![0].usable_report).toBe(true);
+  expect(dbSessions.length).toBe(1); // EXACTLY ONE session, zero duplicates!
+  expect(dbSessions[0].reporting_method).toBe('SAFEDOSE');
+  expect(dbSessions[0].completion_seconds).toBeGreaterThan(0);
+  expect(dbSessions[0].completeness_score).toBeGreaterThan(80);
+  expect(dbSessions[0].usable_report).toBe(true);
 
   // 8 & 9. Open /review and confirm new report appears in queue
   await page.goto('/review');
@@ -122,12 +110,8 @@ test('End-to-End Manual Smoke Test & Submission Verification', async ({ page }) 
   await page.locator('button:has-text("Save Review")').click();
   await expect(page.locator('text=Review saved at')).toBeVisible();
 
-  // Confirm in Supabase
-  const { data: updatedReport } = await supabase
-    .from('near_miss_reports')
-    .select('status, reviewer_notes')
-    .eq('id', newReportId)
-    .single();
+  // Confirm in database state
+  const updatedReport = dbState.reports.find((r) => r.id === newReportId);
   expect(updatedReport?.status).toBe('Under Review');
   expect(updatedReport?.reviewer_notes).toContain('Smoke test verification pass');
 

@@ -6,7 +6,6 @@ import {
   Clock,
   Sparkles,
   HeartHandshake,
-  Building,
   CheckCircle2,
   Send,
   Info,
@@ -283,7 +282,7 @@ export function StakeholderValidation() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Usability Rating (1-5)</label>
               <select
@@ -291,20 +290,34 @@ export function StakeholderValidation() {
                 onChange={(e) => setRating(Number(e.target.value))}
                 className="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
               >
-                <option value={5}>5 - Outstanding (Intuitive, rapid, zero friction)</option>
-                <option value={4}>4 - Good (Much faster than legacy systems)</option>
+                <option value={5}>5 - Outstanding (Intuitive, rapid)</option>
+                <option value={4}>4 - Good (Faster than legacy)</option>
                 <option value={3}>3 - Acceptable</option>
                 <option value={2}>2 - Needs improvement</option>
                 <option value={1}>1 - Poor</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Key Operational Benefit Identified</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Psychological Safety (1-5)</label>
+              <select
+                value={safetyScore}
+                onChange={(e) => setSafetyScore(Number(e.target.value))}
+                className="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
+              >
+                <option value={5}>5 - High trust & blame-free</option>
+                <option value={4}>4 - Reassuring</option>
+                <option value={3}>3 - Moderate</option>
+                <option value={2}>2 - Low trust</option>
+                <option value={1}>1 - Punitive risk</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Key Operational Benefit</label>
               <input
                 type="text"
                 value={keyBenefit}
                 onChange={(e) => setKeyBenefit(e.target.value)}
-                placeholder="e.g. Eliminates blame, saves 15 minutes per shift"
+                placeholder="e.g. Eliminates blame, saves 15m"
                 className="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
               />
             </div>

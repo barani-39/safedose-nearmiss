@@ -4,7 +4,6 @@ import {
   ClipboardList,
   FileText,
   BarChart3,
-  ArrowRight,
   TrendingUp,
   Clock,
   CheckCircle2,
@@ -14,8 +13,6 @@ import {
   Sparkles,
   Info,
   Layers,
-  ChevronRight,
-  Zap,
 } from 'lucide-react';
 import {
   BarChart,
@@ -29,7 +26,7 @@ import {
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
 import type { EvaluationSession } from '@/types';
-import { LoadingSpinner, EmptyState } from '@/components/States';
+import { LoadingSpinner } from '@/components/States';
 import { reconcileEvaluationSessions, type ReconciliationResult } from '@/lib/reconciliation';
 
 interface TargetDefinition {

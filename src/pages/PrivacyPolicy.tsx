@@ -3,14 +3,10 @@ import {
   ShieldCheck,
   Lock,
   EyeOff,
-  UserCheck,
-  FileCheck,
   AlertTriangle,
   HeartHandshake,
-  CheckCircle2,
   Scale,
   Building2,
-  FileText,
 } from 'lucide-react';
 import { DisclaimerBar } from '@/components/Alert';
 import { MEDICAL_DISCLAIMER } from '@/lib/constants';

@@ -12,9 +12,6 @@ import {
   HeartPulse,
   Syringe,
   Sparkles,
-  Info,
-  Check,
-  RotateCcw,
 } from 'lucide-react';
 import { DisclaimerBar } from '@/components/Alert';
 import { MEDICAL_DISCLAIMER } from '@/lib/constants';

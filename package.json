@@ -9,9 +9,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"tests/e2e/**\" --exclude \"tests/integration/**\"",
+    "test:unit": "vitest run --exclude \"tests/e2e/**\" --exclude \"tests/integration/**\"",
+    "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run --exclude \"tests/e2e/**\" && playwright test",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
