@@ -152,7 +152,7 @@ export function ReportForm() {
 
     if (error) {
       setSubmitting(false);
-      setSubmitError('There was a problem submitting your report. Please try again.');
+      setSubmitError('Backend service is currently unavailable. Please verify network connectivity or try again later.');
       return;
     }
 

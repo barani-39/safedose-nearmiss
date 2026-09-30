@@ -8,21 +8,28 @@ import {
   Layers,
   ArrowLeft,
   FileCheck,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { NearMissReport } from '@/types';
 import { LoadingSpinner } from '@/components/States';
 import { useAuth } from '@/contexts';
-import { recordAuditEvent } from '@/lib/audit';
+import { recordAuditEvent, getAuditTrailSummary, flushBufferedAuditEvents } from '@/lib/audit';
 
 export function AuditReport() {
   const { role, user } = useAuth();
   const [reports, setReports] = useState<NearMissReport[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generatedDate] = useState(() => new Date().toLocaleString('en-GB', {
-    dateStyle: 'full',
-    timeStyle: 'short',
-  }));
+  const [auditSummary, setAuditSummary] = useState(() => getAuditTrailSummary());
+  const [isFlushing, setIsFlushing] = useState(false);
+  const [flushMessage, setFlushMessage] = useState('');
+  const [generatedDate] = useState(() =>
+    new Date().toLocaleString('en-GB', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+    })
+  );
 
   useEffect(() => {
     async function load() {
@@ -34,19 +41,33 @@ export function AuditReport() {
       setReports((data || []) as NearMissReport[]);
       setLoading(false);
 
-      recordAuditEvent({
+      await recordAuditEvent({
         action: 'AUDIT_REPORT_GENERATED',
         resource_type: 'REPORT',
         user_id: user?.id,
         user_role: role,
         details: { count: data?.length || 0 },
       });
+      setAuditSummary(getAuditTrailSummary());
     }
     load();
   }, [role, user]);
 
   function handlePrint() {
     window.print();
+  }
+
+  async function handleFlushBuffer() {
+    setIsFlushing(true);
+    const res = await flushBufferedAuditEvents();
+    setIsFlushing(false);
+    setAuditSummary(getAuditTrailSummary());
+    setFlushMessage(
+      res.flushedCount > 0
+        ? `Successfully synchronized ${res.flushedCount} events to server.`
+        : 'Server synchronization attempted. Any offline events remain buffered.'
+    );
+    setTimeout(() => setFlushMessage(''), 4000);
   }
 
   if (loading) return <LoadingSpinner label="Generating clinical safety audit report..." />;
@@ -80,7 +101,7 @@ export function AuditReport() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top action bar (hidden on print) */}
-      <div className="print:hidden flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <Link
           to="/dashboard"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
@@ -88,17 +109,36 @@ export function AuditReport() {
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
         </Link>
-        <button
-          onClick={handlePrint}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition shadow-sm"
-        >
-          <Printer className="w-4 h-4" />
-          Print / Save PDF Audit Report
-        </button>
+        <div className="flex items-center gap-2">
+          {auditSummary.pendingBuffer > 0 && (
+            <button
+              onClick={handleFlushBuffer}
+              disabled={isFlushing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition"
+              title="Attempt to flush offline buffer to server"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFlushing ? 'animate-spin' : ''}`} />
+              Sync Offline Buffer ({auditSummary.pendingBuffer})
+            </button>
+          )}
+          <button
+            onClick={handlePrint}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition shadow-sm"
+          >
+            <Printer className="w-4 h-4" />
+            Print / Save Audit Report as PDF
+          </button>
+        </div>
       </div>
 
+      {flushMessage && (
+        <div className="print:hidden p-3 rounded-lg bg-teal-50 border border-teal-200 text-teal-800 text-xs font-medium">
+          {flushMessage}
+        </div>
+      )}
+
       {/* Printable Report Document */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-12 shadow-sm space-y-8 print:border-none print:shadow-none print:p-0">
+      <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-12 shadow-sm space-y-8 print:border-none print:shadow-none print:p-0 print:space-y-6">
         {/* Header */}
         <div className="border-b-2 border-slate-900 pb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
@@ -122,13 +162,15 @@ export function AuditReport() {
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <span>{generatedDate}</span>
             </div>
-            <div className="text-[11px]">Auditor Role: <span className="font-semibold text-slate-800">{role}</span></div>
+            <div className="text-[11px]">
+              Auditor Role: <span className="font-semibold text-slate-800">{role}</span>
+            </div>
             <div className="text-[10px] text-teal-700 font-mono">STATUS: FORMAL COMPLIANCE AUDIT</div>
           </div>
         </div>
 
         {/* Executive Summary Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 break-inside-avoid">
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
             <span className="text-[10px] uppercase font-bold text-slate-500">Total Captured Events</span>
             <div className="mt-1 text-2xl font-black text-slate-900">{totalReports}</div>
@@ -153,8 +195,19 @@ export function AuditReport() {
           </div>
         </div>
 
+        {/* Audit Pipeline Architecture Statement */}
+        <section className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs text-slate-800 break-inside-avoid">
+          <div className="flex items-center gap-2 font-bold text-slate-900">
+            <Database className="w-4 h-4 text-teal-700" />
+            Append-only server audit trail with best-effort offline buffering
+          </div>
+          <p className="leading-relaxed text-[11px] text-slate-600">
+            Operational audit events are persisted to PostgreSQL with Row-Level Security (RLS) enforcement. Database records are append-only; standard users and reviewers cannot alter or delete logged actions. In offline or partitioned network scenarios, events are buffered locally with non-authoritative pending status ({auditSummary.pendingBuffer} buffered) until connectivity returns and automatic flush occurs.
+          </p>
+        </section>
+
         {/* Clinical Guardrails & Compliance Statement */}
-        <section className="p-4 rounded-xl bg-teal-50/60 border border-teal-200 space-y-2 text-xs text-teal-950">
+        <section className="p-4 rounded-xl bg-teal-50/60 border border-teal-200 space-y-2 text-xs text-teal-950 break-inside-avoid">
           <div className="flex items-center gap-2 font-bold text-teal-900">
             <ShieldCheck className="w-4 h-4 text-teal-700" />
             Zero-Harm Invariant & Psychological Safety Certification
@@ -165,7 +218,7 @@ export function AuditReport() {
         </section>
 
         {/* Contributing Factors & Root Cause Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs break-inside-avoid">
           <div className="border border-slate-200 rounded-xl p-5 space-y-3">
             <div className="flex items-center gap-2 font-bold text-slate-900">
               <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -222,7 +275,7 @@ export function AuditReport() {
         </div>
 
         {/* Recent High Priority Interceptions */}
-        <section className="space-y-3 text-xs">
+        <section className="space-y-3 text-xs break-inside-avoid">
           <div className="flex items-center gap-2 font-bold text-slate-900">
             <FileCheck className="w-4 h-4 text-teal-600" />
             Recent Near-Miss Incident Log Samples (High Priority Triage)
@@ -262,13 +315,18 @@ export function AuditReport() {
         </section>
 
         {/* Governance Sign-off Footer */}
-        <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-slate-500 break-inside-avoid">
           <div>
             <div className="font-bold text-slate-800">Hospital Medication Safety Committee</div>
             <div className="text-[11px]">Certified Non-Punitive Near-Miss Learning Audit</div>
           </div>
           <div className="text-right text-[10px] space-y-0.5">
-            <div>Verification Hash: <span className="font-mono">SHA256-DETERMINISTIC-AUDIT</span></div>
+            <div>
+              Audit Pipeline:{' '}
+              <span className="font-semibold text-slate-700">
+                Append-only server audit trail with best-effort offline buffering
+              </span>
+            </div>
             <div>SafeDose NearMiss Clinical Safety Architecture v2.4</div>
           </div>
         </div>

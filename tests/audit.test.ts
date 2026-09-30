@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { recordAuditEvent, getLocalAuditEvents } from '../src/lib/audit';
+import { recordAuditEvent, getLocalAuditEvents, getAuditTrailSummary } from '../src/lib/audit';
 
-describe('Audit Logging System', () => {
+describe('Append-only Audit Trail & Offline Buffering System', () => {
   // Mock localStorage for test environment
   const store: Record<string, string> = {};
   beforeEach(() => {
@@ -55,5 +55,44 @@ describe('Audit Logging System', () => {
     expect(events.length).toBe(2);
     expect(events[0].action).toBe('ACTION_SECOND');
     expect(events[1].action).toBe('ACTION_FIRST');
+  });
+
+  it('sanitizes sensitive data and narrative text before saving to offline buffer', async () => {
+    await recordAuditEvent({
+      action: 'REPORT_SUBMITTED',
+      resource_type: 'REPORT',
+      resource_id: 'rep-456',
+      user_role: 'REPORTER',
+      details: {
+        ward: 'Emergency',
+        password: 'sensitive-password-123',
+        token: 'jwt-auth-bearer-token',
+        short_description: 'Patient John Doe received extra insulin',
+        count: 1,
+      },
+    });
+
+    const events = getLocalAuditEvents();
+    expect(events.length).toBe(1);
+    const details = events[0].details;
+    expect(details.ward).toBe('Emergency');
+    expect(details.count).toBe(1);
+    expect(details.password).toBe('[REDACTED_FOR_PRIVACY]');
+    expect(details.token).toBe('[REDACTED_FOR_PRIVACY]');
+    expect(details.short_description).toBe('[REDACTED_FOR_PRIVACY]');
+  });
+
+  it('tracks offline buffered status and returns correct audit summary', async () => {
+    await recordAuditEvent({
+      action: 'EXPORT_GENERATED',
+      resource_type: 'EXPORT',
+      user_role: 'ADMIN',
+      details: { format: 'CSV' },
+    });
+
+    const summary = getAuditTrailSummary();
+    expect(summary.totalLocal).toBe(1);
+    // In test environment without a real remote Supabase response, event is buffered offline
+    expect(summary.pendingBuffer).toBe(1);
   });
 });

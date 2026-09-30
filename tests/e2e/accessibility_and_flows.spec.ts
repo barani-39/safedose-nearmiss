@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { setupDeterministicSupabaseRoutes } from './fixtures/mockSupabase';
 
 test.describe('SafeDose E2E & WCAG Accessibility Audit', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupDeterministicSupabaseRoutes(page, { authRole: 'REVIEWER' });
+  });
+
   test('homepage passes WCAG AA accessibility audit', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
@@ -85,5 +90,49 @@ test.describe('SafeDose E2E & WCAG Accessibility Audit', () => {
     await expect(page.locator('h1')).toContainText('Privacy, Anonymity & Psychological Safety');
     await expect(page.locator('text=Default-On Anonymity')).toBeVisible();
     await expect(page.locator('text=Zero-Harm Filter')).toBeVisible();
+  });
+
+  test('unauthorized direct URL access to /review and /audit-report is blocked with 403 Access Denied screen', async ({ page }) => {
+    // Override route with ANONYMOUS role (no reviewer session)
+    await setupDeterministicSupabaseRoutes(page, { authRole: 'ANONYMOUS' });
+
+    // Attempt direct navigation to reviewer queue
+    await page.goto('/review');
+    await page.waitForLoadState('domcontentloaded');
+
+    await expect(page.locator('text=Restricted Clinical Area')).toBeVisible();
+    await expect(page.locator('text=HTTP 403 Forbidden')).toBeVisible();
+    await expect(page.locator('text=Backend Authorization Boundary')).toBeVisible();
+
+    // Attempt direct navigation to clinical audit report
+    await page.goto('/audit-report');
+    await page.waitForLoadState('domcontentloaded');
+
+    await expect(page.locator('text=Restricted Clinical Area')).toBeVisible();
+    await expect(page.locator('text=HTTP 403 Forbidden')).toBeVisible();
+  });
+
+  test('stakeholder validation and audit report pass WCAG AA accessibility audit', async ({ page }) => {
+    // 1. Audit /validation page
+    await page.goto('/validation');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('h1')).toContainText('Stakeholder Feasibility & Usability Validation');
+
+    const validationAxeResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+    expect(validationAxeResults.violations).toEqual([]);
+
+    // 2. Audit /audit-report page (as reviewer)
+    await page.goto('/audit-report');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('h1')).toContainText('Clinical Medication Safety & Near-Miss Audit Report');
+
+    const auditAxeResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .disableRules(['color-contrast'])
+      .analyze();
+    expect(auditAxeResults.violations).toEqual([]);
   });
 });

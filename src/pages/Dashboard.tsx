@@ -106,28 +106,36 @@ export function Dashboard() {
 
   const weeklyTrendData = useMemo(() => {
     if (reports.length === 0) return [];
-    const sorted = [...reports].sort(
+    const validReports = reports.filter((r) => !isNaN(new Date(r.created_at).getTime()));
+    if (validReports.length === 0) return [];
+
+    const sorted = [...validReports].sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
 
-    const buckets: Record<string, { week: string; count: number; highPriority: number; resolved: number }> = {};
+    const buckets: Record<
+      string,
+      { sortKey: string; week: string; count: number; highPriority: number; resolved: number }
+    > = {};
+
     for (const r of sorted) {
       const d = new Date(r.created_at);
       const startOfWeek = new Date(d);
       const day = startOfWeek.getDay();
       const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
       startOfWeek.setDate(diff);
+      const sortKey = startOfWeek.toISOString().slice(0, 10);
       const key = `${startOfWeek.getDate()} ${startOfWeek.toLocaleString('default', { month: 'short' })}`;
 
-      if (!buckets[key]) {
-        buckets[key] = { week: key, count: 0, highPriority: 0, resolved: 0 };
+      if (!buckets[sortKey]) {
+        buckets[sortKey] = { sortKey, week: key, count: 0, highPriority: 0, resolved: 0 };
       }
-      buckets[key].count += 1;
-      if (r.operational_priority === 'HIGH') buckets[key].highPriority += 1;
-      if (r.status === 'Closed') buckets[key].resolved += 1;
+      buckets[sortKey].count += 1;
+      if (r.operational_priority === 'HIGH') buckets[sortKey].highPriority += 1;
+      if (r.status === 'Closed') buckets[sortKey].resolved += 1;
     }
 
-    return Object.values(buckets);
+    return Object.values(buckets).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [reports]);
 
   const insights = useMemo(() => {

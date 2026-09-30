@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Layout } from '@/components/Layout';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Home } from '@/pages/Home';
 import { ReportForm } from '@/pages/ReportForm';
 import { SubmissionConfirmation } from '@/pages/SubmissionConfirmation';
@@ -25,10 +26,31 @@ export function App() {
             <Route path="/" element={<Home />} />
             <Route path="/report" element={<ReportForm />} />
             <Route path="/report/confirmation/:id" element={<SubmissionConfirmation />} />
-            <Route path="/review" element={<ReviewQueue />} />
-            <Route path="/review/:id" element={<ReportDetail />} />
+            <Route
+              path="/review"
+              element={
+                <ProtectedRoute allowedRoles={['REVIEWER', 'ADMIN']}>
+                  <ReviewQueue />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/review/:id"
+              element={
+                <ProtectedRoute allowedRoles={['REVIEWER', 'ADMIN']}>
+                  <ReportDetail />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/audit-report" element={<AuditReport />} />
+            <Route
+              path="/audit-report"
+              element={
+                <ProtectedRoute allowedRoles={['REVIEWER', 'ADMIN']}>
+                  <AuditReport />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/journeys" element={<PatientJourneys />} />
             <Route path="/validation" element={<StakeholderValidation />} />
             <Route path="/evaluation" element={<Evaluation />} />

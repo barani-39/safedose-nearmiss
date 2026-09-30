@@ -104,6 +104,8 @@ export interface AuditEvent {
   resource_type: 'REPORT' | 'EVALUATION' | 'AUTH' | 'EXPORT' | 'REVIEW';
   resource_id: string | null;
   details: Record<string, unknown>;
+  server_persisted?: boolean;
+  is_buffered_offline?: boolean;
 }
 
 export interface StakeholderReview {

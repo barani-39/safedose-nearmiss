@@ -8,9 +8,9 @@ This directory contains benchmark datasets, provenance audits, and reproducibili
 
 - **Primary Benchmark File**: [`near_miss_cases.csv`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/data/evaluation/near_miss_cases.csv)
 - **Export Artifacts**: [`data/evaluation/exports/`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/data/evaluation/exports/)
-- **Total Benchmark Cases**: 25 standardized scenarios
-- **Provenance Category**: `SYNTHETIC BENCHMARK` (explicitly flagged; no real patient data)
-- **Reference Standard**: Modeled on public medication error taxonomies from the Institute for Safe Medication Practices (ISMP), World Health Organization (WHO) Patient Safety Curriculum, and NHS England Patient Safety Alerts.
+- **Total Benchmark Cases**: 25 synthetic benchmark scenarios created for SafeDose evaluation using generic medication-safety event categories.
+- **Provenance Category**: `SYNTHETIC BENCHMARK` (explicitly flagged; no real patient or hospital data).
+- **Taxonomy Inspiration vs Case Provenance**: Scenarios are generic educational simulations inspired by common medication safety error categories. These are NOT actual hospital incidents, WHO cases, or ISMP incident reports.
 
 ---
 
