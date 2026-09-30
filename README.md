@@ -74,35 +74,116 @@ All data artifacts across the application and documentation are classified under
 
 ## 4. Verification & Testing Pyramid
 
-SafeDose enforces a 3-tier testing pyramid with 100% pass rates across all suites:
+SafeDose enforces a 3-tier testing pyramid with 100% pass rates across all suites (total 57 automated tests: 49 unit/invariant tests + 8 Playwright E2E/WCAG tests):
 
-| Tier | Test Suite | Runner | Tests | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tier 1: Unit & Invariant** | Safety boundaries, PII detection, completeness scoring, RBAC roles, audit logging, CWE-1236 CSV sanitization | Vitest | 25 Tests | **25 / 25 Passing** |
-| **Tier 2: Live Integration** | Supabase database connectivity, schema verification, head queries | Vitest Integration | 1 Suite | **Passing / Resilient** |
-| **Tier 3: End-to-End & A11y** | Manual smoke test flow, form submission, triage status update, WCAG AA accessibility audit | Playwright (Chromium) | 6 Tests | **6 / 6 Passing** |
+| Tier | Test Suite | Runner | Scope & Coverage | Tests | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Tier 1: Unit & Invariant** | `safety.test.ts`, `evaluation.test.ts`, `auth.test.ts`, `audit.test.ts`, `export.test.ts`, `dashboard.test.ts`, `patientJourneys.test.ts`, `errorBoundary.test.ts` | Vitest | Safety boundaries, PII detection, completeness scoring, RBAC roles, audit logging, CWE-1236 CSV sanitization, timeline navigation, ErrorBoundary fallback & suppression | 8 Suites / 49 Tests | **49 / 49 Passing (100%)** |
+| **Tier 2: Live Integration** | `supabase.integration.test.ts` | Vitest Integration | Live Supabase PostgreSQL database connectivity, schema verification, head queries, offline fallback | 1 Suite | **Passing / Resilient** |
+| **Tier 3: End-to-End & A11y** | `manual_smoke_flow.spec.ts`, `accessibility_and_flows.spec.ts` | Playwright (Chromium) | Manual smoke test flow, report form submission, triage status update, timeline stepper, 403 access control, WCAG AA accessibility audit | 2 Files / 8 Tests | **8 / 8 Passing (100%)** |
+
+> For granular test specifications, invariants, normal/boundary/failure test matrices, and clinical test philosophy, see [`docs/testing.md`](docs/testing.md).
 
 ### Running Test Suites
 ```bash
-# Run unit tests
+# Run unit tests (49 tests across 8 suites)
 npm run test:unit
 
 # Run live Supabase integration tests
 npm run test:integration
 
-# Run Playwright E2E and WCAG AA accessibility audit
+# Run Playwright E2E and WCAG AA accessibility audit (8 tests)
 npm run test:e2e
 
 # Run all test suites
 npm run test:all
 
-# Complete verification pipeline (Lint, Typecheck, Unit Tests, Production Build)
+# Complete verification pipeline (Lint, Typecheck, 49 Unit Tests, Production Build)
 npm run verify
 ```
 
 ---
 
-## 5. Quickstart & Reproducibility CLI
+## 5. Database Schema & Entity Relationships
+
+SafeDose utilizes a relational PostgreSQL schema managed via Supabase with strict Row Level Security (RLS) policies on all tables:
+
+```
+    ┌──────────────────────┐              ┌──────────────────────────┐
+    │       PROFILES       │              │    NEAR_MISS_REPORTS     │
+    ├──────────────────────┤              ├──────────────────────────┤
+    │ id (UUID, PK)        │ 1 ──────── 0 │ id (UUID, PK)            │
+    │ email (TEXT)         │   reports_   │ reporter_id (UUID, FK)   │
+    │ role (user_role)     │   user_id_fk │ incident_type (TEXT)     │
+    │ display_name (TEXT)  │              │ operational_priority     │
+    │ department (TEXT)    │              │ status (report_status)   │
+    └──────────────────────┘              └────────────┬─────────────┘
+               │                                       │
+               │ 1                                     │ 1
+               │                                       │
+               │ has_many                              │ 1:1 linked_session
+               ▼                                       ▼
+    ┌──────────────────────┐              ┌──────────────────────────┐
+    │     AUDIT_EVENTS     │              │   EVALUATION_SESSIONS    │
+    ├──────────────────────┤              ├──────────────────────────┤
+    │ id (TEXT, PK)        │              │ id (UUID, PK)            │
+    │ user_id (UUID, FK)   │              │ report_id (UUID, FK, UQ) │
+    │ action (TEXT)        │              │ session_type (TEXT)      │
+    │ resource_type (TEXT) │              │ completion_time_seconds  │
+    │ resource_id (TEXT)   │              │ data_completeness_score  │
+    │ details (JSONB)      │              └──────────────────────────┘
+    └──────────────────────┘
+```
+
+| Table Name | Primary Key | Foreign Keys | Row Level Security (RLS) Policy | Operational Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **`near_miss_reports`** | `id` (UUID) | `reporter_id` → `profiles(id)` | Anon/authenticated `INSERT`; Reporters view own; Reviewers/Admins view all & `UPDATE`. | Core medication near-miss incident repository with structured triage fields and zero-harm gatekeeping. |
+| **`evaluation_sessions`**| `id` (UUID) | `report_id` → `near_miss_reports(id)` (UNIQUE) | Public/authenticated `INSERT` & `SELECT`; Admins full management. | System benchmarking telemetry recording completion speed, completeness scores, and heuristic concordance. |
+| **`profiles`** | `id` (UUID) | References `auth.users(id)` | Users view own; Admins full management. | Authoritative user identities, display names, clinical departments, and RBAC roles (`REPORTER`, `REVIEWER`, `ADMIN`). |
+| **`audit_events`** | `id` (TEXT) | `user_id` → `profiles(id)` | Append-only `INSERT` for authenticated/anon; Admins read-only `SELECT`; `UPDATE`/`DELETE` hard-blocked. | Immutable audit log capturing security, report submission, review triage, and export actions. |
+| **`stakeholder_feedback`**| `id` (UUID) | None (consent metadata) | Public/authenticated `INSERT`; Authenticated `SELECT`. | Formally records domain expert evaluations, methodology feedback, and research consent. |
+
+> Complete column definitions, data types, constraints, index strategies, and PostgreSQL RLS policies are documented in [`docs/database-schema.md`](docs/database-schema.md).
+
+---
+
+## 6. API Endpoints & PostgREST Data Operations
+
+SafeDose interacts with PostgreSQL via Supabase's PostgREST API layer. All operations enforce least-privilege role boundaries and safe offline fallback:
+
+| Operation ID | Supabase Table / Endpoint | REST Method | Authorized Roles | Primary Payload / Filters | Error Containment |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **OP-01** | `/rest/v1/near_miss_reports` | `POST` | `ANONYMOUS`, `REPORTER`, `REVIEWER`, `ADMIN` | Sanitized report record (15 structured fields; PII & medical advice stripped). | Non-blocking toast notification; returns client error on RLS violation. |
+| **OP-02** | `/rest/v1/near_miss_reports` | `GET` | `REVIEWER`, `ADMIN` (All); `REPORTER` (Own) | Filtered by `status`, `operational_priority`, ordered by `created_at DESC`. | Empty list fallback with clinical error state banner. |
+| **OP-03** | `/rest/v1/near_miss_reports?id=eq.{id}` | `PATCH` | `REVIEWER`, `ADMIN` | Status transition, reviewer notes, verified category/priority. | Reverts optimistic UI update on failure; audit event logged. |
+| **OP-04** | `/rest/v1/evaluation_sessions` | `POST` | `ANONYMOUS`, `REPORTER`, `REVIEWER`, `ADMIN` | Session metrics (`completion_time_seconds`, `data_completeness_score`, `report_id`). | Silent background ingestion; failures do not disrupt report workflow. |
+| **OP-05** | `/rest/v1/evaluation_sessions` | `GET` | Public / All | Benchmark telemetry joined with reports for comparative evaluation dashboard. | Falls back to deterministic synthetic baseline datasets. |
+| **OP-06** | `/rest/v1/profiles?id=eq.{id}` | `GET` | Authenticated (`id = auth.uid()`) | Single profile lookup (`id, email, role, display_name, department`). | Falls back to JWT metadata if table is offline; defaults to `ANONYMOUS`. |
+| **OP-07** | `/rest/v1/audit_events` | `POST` | All (Append-Only) | Sanitized event record (PII/secrets redacted; local ring buffer synced). | Dual-write: buffered in `localStorage` ring buffer if network is unreachable. |
+| **OP-08** | `/rest/v1/audit_events` | `GET` | `ADMIN` only | Query last 50 audit entries ordered by `created_at DESC`. | Restricted by RLS; returns empty set to unauthorized roles. |
+| **OP-09** | `/rest/v1/stakeholder_feedback` | `POST` | All | Clinical stakeholder feedback with consent confirmation and rating scores. | Non-blocking submission modal with success confirmation. |
+
+> Complete request/response schemas, JSON payloads, headers, query parameters, and integration error handling are documented in [`docs/api-reference.md`](docs/api-reference.md).
+
+---
+
+## 7. Fault Tolerance & Error Boundary Architecture
+
+SafeDose implements a multi-tiered resilience framework to guarantee high clinical availability:
+
+- **React Error Boundary (`ErrorBoundary.tsx`)**: Wraps application route hierarchies to intercept unhandled JavaScript rendering exceptions:
+  - **Fail-Safe Clinical Fallback**: Displays accessible diagnostic alert (`role="alert"`) with error message and action buttons.
+  - **Stack Trace Suppression**: Prevents raw JavaScript stack traces and internal architecture leaks in production.
+  - **Recovery Handlers**: Provides *"Try Again"* (component tree remount) and *"Return to SafeDose Home"* recovery actions.
+  - **Isolated Unit Testing**: 6 automated tests verify error interception, clean state, reset execution, and fallback rendering.
+- **Offline Data Resilience**: Dual-write pattern with 100-item local ring buffer ensures audit logs and telemetry are preserved even during acute network outages.
+- **Graceful Network Degradation**: All UI dashboards fallback gracefully to deterministic synthetic benchmarks if remote Supabase endpoints are unreachable.
+
+> Complete error classification (10 categories), containment analysis, and fallback UX are documented in [`docs/error-handling.md`](docs/error-handling.md).
+
+---
+
+## 8. Quickstart & Reproducibility CLI
 
 ### Installation
 ```bash
@@ -142,7 +223,7 @@ npm run eval:export
 
 ---
 
-## 6. Security, RBAC & Row Level Security
+## 9. Security, RBAC & Row Level Security
 
 | Role | Operational Scope | Database Permissions |
 | :--- | :--- | :--- |
@@ -151,25 +232,29 @@ npm run eval:export
 | **`REVIEWER`** | Medication Safety Committee | Triage queue access, reviewer notes editing, category confirmation, priority adjustments. |
 | **`ADMIN`** | Hospital Clinical Governance Lead | Full administrative access, audit event inspection, compliance data export. |
 
-Detailed specifications are available in [`docs/security-and-roles.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/security-and-roles.md).
+Detailed specifications are available in [`docs/security-and-roles.md`](docs/security-and-roles.md).
 
 ---
 
-## 7. Documentation Index
+## 10. Documentation Index
 
 Comprehensive engineering, scientific, and clinical documentation is organized in `docs/`:
 
-- [`docs/verification.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/verification.md) — 3-Tier verification pipeline, CI workflow, and Playwright deterministic interception.
-- [`docs/evaluation-methodology.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/evaluation-methodology.md) — Empirical scientific protocol, hypotheses, mathematical formulas, and limitation disclosures.
-- [`docs/evaluation-sessions.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/evaluation-sessions.md) — Telemetry schema, relationship to reports, and reconciliation mechanism.
-- [`docs/security-and-roles.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/security-and-roles.md) — RBAC permissions, PostgreSQL RLS policies, and tamper-evident audit logging.
-- [`docs/stakeholder-validation.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/docs/stakeholder-validation.md) — Domain review framework, consent requirements, and hospital trial roadmap.
-- [`data/evaluation/README.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/data/evaluation/README.md) — Dataset dictionary and benchmark scenario schemas.
-- [`data/evaluation/provenance.md`](file:///c:/Users/dhara/Downloads/Safe%20dose/project/data/evaluation/provenance.md) — Ground truth provenance audit trail across all system metrics.
+- [`docs/testing.md`](docs/testing.md) — Granular unit testing documentation, 4-tier pyramid, per-suite invariants, normal/boundary/failure test matrix.
+- [`docs/error-handling.md`](docs/error-handling.md) — React Error Boundary architecture, 10 error categories, containment analysis, fallback UI.
+- [`docs/api-reference.md`](docs/api-reference.md) — Supabase PostgREST data contracts (OP-01 to OP-09), schemas, payloads, error containment.
+- [`docs/database-schema.md`](docs/database-schema.md) — PostgreSQL table definitions, Mermaid ERD, column constraints, indexes, RLS policies.
+- [`docs/verification.md`](docs/verification.md) — 3-Tier verification pipeline, CI workflow, and Playwright deterministic interception.
+- [`docs/evaluation-methodology.md`](docs/evaluation-methodology.md) — Empirical scientific protocol, hypotheses, mathematical formulas, and limitation disclosures.
+- [`docs/evaluation-sessions.md`](docs/evaluation-sessions.md) — Telemetry schema, relationship to reports, and reconciliation mechanism.
+- [`docs/security-and-roles.md`](docs/security-and-roles.md) — RBAC permissions, PostgreSQL RLS policies, and tamper-evident audit logging.
+- [`docs/stakeholder-validation.md`](docs/stakeholder-validation.md) — Domain review framework, consent requirements, and hospital trial roadmap.
+- [`data/evaluation/README.md`](data/evaluation/README.md) — Dataset dictionary and benchmark scenario schemas.
+- [`data/evaluation/provenance.md`](data/evaluation/provenance.md) — Ground truth provenance audit trail across all system metrics.
 
 ---
 
-## 8. Explicit Disclaimers
+## 11. Explicit Disclaimers
 
 > [!CAUTION]
 > **Operational Prototype Notice**:
@@ -177,3 +262,4 @@ Comprehensive engineering, scientific, and clinical documentation is organized i
 > - **NOT MEDICAL ADVICE**: The platform does not prescribe, diagnose, adjust medication dosages, or recommend clinical treatments.
 > - **ZERO-HARM BOUNDARY**: Events involving known patient harm must be escalated through formal institutional incident management channels (e.g. Datix, Ulysses, NRLS/LFPSE).
 > - **PENDING CLINICAL VALIDATION**: Real-world acute hospital deployments and randomized clinical trials remain future research milestones subject to ethics and institutional governance board approvals.
+

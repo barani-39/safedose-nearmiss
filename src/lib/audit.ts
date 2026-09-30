@@ -19,6 +19,17 @@ const LOCAL_BUFFER_KEY = 'safedose_audit_log';
 const MAX_LOCAL_ENTRIES = 100;
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+/**
+ * Sanitizes audit payload details prior to logging or buffering.
+ * 
+ * PRIVACY & SECURITY GUARDRAILS:
+ * - Redacts credential artifacts (password, token, secret, auth)
+ * - Redacts clinical free-text narratives (short_description, immediate_action) to uphold reporter psychological safety
+ * - Recursively processes nested dictionaries while preserving scalar audit parameters (IDs, counts, flags)
+ * 
+ * @param details - Raw dictionary of contextual metadata
+ * @returns Scrubbed dictionary safe for database persistence and offline storage
+ */
 function sanitizeAuditDetails(details: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
   const forbiddenKeys = ['password', 'token', 'secret', 'auth', 'short_description', 'immediate_action'];
@@ -35,6 +46,20 @@ function sanitizeAuditDetails(details: Record<string, unknown>): Record<string, 
   return sanitized;
 }
 
+/**
+ * Records an immutable audit log entry using a dual-write resilient pattern.
+ * 
+ * ARCHITECTURAL FLOW:
+ * 1. Sanitization: Strips PII/credentials via `sanitizeAuditDetails`.
+ * 2. Local Ring Buffer: Appends to browser storage (`safedose_audit_log`) with 100-item cap and 7-day retention.
+ *    Marks initial state as `server_persisted = false` and `is_buffered_offline = true`.
+ * 3. PostgreSQL Server Persistence: Attempts atomic insert into `audit_events` via Supabase PostgREST.
+ *    On success, updates local record to `server_persisted = true` and `is_buffered_offline = false`.
+ *    On network failure or offline mode, fails gracefully without blocking the clinical workflow.
+ * 
+ * @param params - Audit payload containing action, resource type, user context, and metadata
+ * @returns Object containing generated UUID and boolean indicating whether server write succeeded
+ */
 export async function recordAuditEvent(params: {
   action: string;
   resource_type: 'REPORT' | 'EVALUATION' | 'AUTH' | 'EXPORT' | 'REVIEW';
@@ -102,6 +127,11 @@ export async function recordAuditEvent(params: {
   return { id: eventId, server_persisted: serverPersisted };
 }
 
+/**
+ * Transitions a buffered event from pending to authoritative state once confirmed by PostgreSQL.
+ * 
+ * @param eventId - Unique identifier of the confirmed audit event
+ */
 function markEventAsServerPersisted(eventId: string): void {
   try {
     if (typeof localStorage === 'undefined') return;
@@ -117,6 +147,11 @@ function markEventAsServerPersisted(eventId: string): void {
   }
 }
 
+/**
+ * Retrieves the local offline audit buffer from browser storage.
+ * 
+ * @returns Array of recent audit events stored locally
+ */
 export function getLocalAuditEvents(): AuditEvent[] {
   try {
     if (typeof localStorage !== 'undefined') {
@@ -130,7 +165,15 @@ export function getLocalAuditEvents(): AuditEvent[] {
 }
 
 /**
- * Attempts to flush unpersisted offline events to the server once online.
+ * Flushes pending offline audit events to PostgreSQL once backend connectivity is restored.
+ * 
+ * RECOVERY BEHAVIOR:
+ * - Scans local ring buffer for records where `server_persisted === false`.
+ * - Replays inserts sequentially against `audit_events`.
+ * - Marks each successful write as persisted.
+ * - Stops immediately on network error to prevent hammering unreachable infrastructure.
+ * 
+ * @returns Summary of flushed count and remaining pending count
  */
 export async function flushBufferedAuditEvents(): Promise<{ flushedCount: number; remainingCount: number }> {
   const events = getLocalAuditEvents();

@@ -2,6 +2,17 @@ import { createContext, useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase';
 import type { UserRole, UserProfile } from '@/types';
 
+/**
+ * Authentication Context Interface
+ * 
+ * Provides reactive access to:
+ * - Current authenticated or demo user profile
+ * - Active RBAC role (`ANONYMOUS`, `REPORTER`, `REVIEWER`, `ADMIN`)
+ * - Demo role switcher status (`isDemoMode`)
+ * - Loading state during asynchronous session validation
+ * - Role switching and sign-out handlers
+ * - Convenience role boolean predicates (`isReviewerOrAdmin`, `isAdmin`)
+ */
 export interface AuthContextType {
   user: UserProfile | null;
   role: UserRole;
@@ -13,6 +24,12 @@ export interface AuthContextType {
   isAdmin: boolean;
 }
 
+/**
+ * Deterministic Fallback User Profiles for Demo / Educational Mode.
+ * 
+ * In production (`VITE_DEMO_ROLE_SWITCHER !== 'true'`), these mock profiles are never used
+ * because identity and role assignment are strictly derived from the PostgreSQL `profiles` table.
+ */
 const DEFAULT_DEMO_PROFILES: Record<UserRole, UserProfile | null> = {
   ANONYMOUS: null,
   REPORTER: {
@@ -40,6 +57,24 @@ const DEFAULT_DEMO_PROFILES: Record<UserRole, UserProfile | null> = {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Authoritative Authentication & Role-Based Access Control Provider.
+ * 
+ * SECURITY ARCHITECTURE:
+ * 1. Authoritative Backend Resolution:
+ *    - Validates existing JWT session via `supabase.auth.getSession()` and `getUser()`.
+ *    - Queries PostgreSQL `profiles` table for verified role assignment (`role IN ('REPORTER', 'REVIEWER', 'ADMIN')`).
+ *    - Falls back to `user_metadata.role` only if database profiles table is temporarily unreachable.
+ * 
+ * 2. Strict Role Gating:
+ *    - If `VITE_DEMO_ROLE_SWITCHER !== 'true'` (production mode), client-side role switching via `setRole`
+ *      is hard-blocked, logging a security warning and preventing client privilege escalation.
+ *    - Unauthenticated sessions default strictly to `ANONYMOUS`.
+ * 
+ * 3. Reactive Session Synchronization:
+ *    - Subscribes to `supabase.auth.onAuthStateChange` to synchronize auth tokens, sign-in, and sign-out
+ *      across multiple browser tabs or token expiries without deadlocks.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isDemoMode = import.meta.env.VITE_DEMO_ROLE_SWITCHER === 'true';
 
@@ -203,6 +238,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isDemoMode]);
 
+  /**
+   * Switches the active perspective in demo/testing mode.
+   * 
+   * SECURITY ENFORCEMENT:
+   * In production mode (`isDemoMode === false`), this function explicitly refuses client-side role modification
+   * to protect against privilege escalation (CWE-269). Production roles are strictly derived
+   * from validated database sessions.
+   * 
+   * @param newRole - Requested role (`ANONYMOUS`, `REPORTER`, `REVIEWER`, `ADMIN`)
+   */
   const setRole = useCallback(
     (newRole: UserRole) => {
       if (!isDemoMode) {
@@ -219,6 +264,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [isDemoMode]
   );
 
+  /**
+   * Terminates active session and resets application auth state.
+   * 
+   * Clears:
+   * - Supabase auth session token
+   * - Local user profile state
+   * - Role state (resets to `ANONYMOUS`)
+   * - Local storage role persistence key
+   */
   const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
@@ -232,6 +286,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /**
+   * Resolved User Profile.
+   * Priority:
+   * 1. Verified Supabase session user (`realUser`)
+   * 2. Mock role profile when `isDemoMode` is active
+   * 3. `null` for unauthenticated anonymous clinical sessions
+   */
   const activeUser = useMemo(() => {
     if (realUser) return realUser;
     if (isDemoMode) return DEFAULT_DEMO_PROFILES[role];

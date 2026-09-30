@@ -22,6 +22,13 @@ import { LoadingSpinner, EmptyState, ErrorState } from '@/components/States';
 
 const PIE_COLORS = ['#0d9488', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
+/**
+ * Aggregates frequency of string occurrences and sorts descending.
+ * Used for categorical charts (incident types, wards, priorities, stages).
+ * 
+ * @param items - Array of string keys
+ * @returns Sorted array of name/count tuples for Recharts consumption
+ */
 function countBy<T extends string>(items: T[]): { name: T; count: number }[] {
   const map = new Map<T, number>();
   for (const item of items) {
@@ -55,6 +62,14 @@ export function Dashboard() {
     load();
   }, []);
 
+  /**
+   * Top-level Operational Governance KPIs:
+   * - `total`: All-time near-miss report volume
+   * - `thisMonth`: Incidents reported from the first calendar day of current month
+   * - `highPriority`: Critical safety triage items requiring immediate review
+   * - `awaitingReview`: Active backlog (status in Submitted or Under Review)
+   * - `closed`: Closed/resolved incidents with documented corrective actions
+   */
   const stats = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -104,6 +119,17 @@ export function Dashboard() {
       .sort((a, b) => b.count - a.count);
   }, [reports]);
 
+  /**
+   * Derives weekly chronological trends anchored to Monday start-of-week boundaries.
+   * 
+   * ALGORITHMIC IMPLEMENTATION:
+   * 1. Filters out invalid timestamps to prevent NaN parsing errors.
+   * 2. Sorts reports chronologically by creation timestamp.
+   * 3. Calculates Monday anchor date: `day = getDay(); diff = getDate() - day + (day === 0 ? -6 : 1)`.
+   * 4. Constructs ISO string sortKey (`YYYY-MM-DD`) ensuring deterministic sorting across month/year boundaries.
+   * 5. Buckets total volume, high-priority counts, and closed/resolved counts per calendar week.
+   * 6. Returns chronologically sorted weekly series for AreaChart rendering.
+   */
   const weeklyTrendData = useMemo(() => {
     if (reports.length === 0) return [];
     const validReports = reports.filter((r) => !isNaN(new Date(r.created_at).getTime()));
@@ -138,6 +164,11 @@ export function Dashboard() {
     return Object.values(buckets).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [reports]);
 
+  /**
+   * Deterministic Operational Heuristic Generator.
+   * Automatically identifies recurrent safety patterns when specific contributing factors,
+   * workflow stages, or incident types reach or exceed a frequency threshold of >= 2.
+   */
   const insights = useMemo(() => {
     const result: string[] = [];
 
